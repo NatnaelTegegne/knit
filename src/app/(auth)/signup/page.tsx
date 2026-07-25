@@ -3,11 +3,8 @@ import { requireUnauth } from "@/lib/auth-utils";
 
 const Page = async () => {
     await requireUnauth();
-    return (
-        <div className="flex flex-col items-center justify-center">
-            <RegisterForm />
-        </div>
-    );
+    return <RegisterForm />
+
 };
 
 export default Page;
