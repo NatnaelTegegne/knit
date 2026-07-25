@@ -68,9 +68,23 @@ export function LoginForm() {
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             <Button variant="outline" className="w-full">
+                                <Image 
+                                src="/logos/github.svg" 
+                                alt="GitHub" 
+                                width={20} 
+                                height={20} 
+                                className="mr-2"
+                                />
                                 Continue with GitHub
                             </Button>
                             <Button variant="outline" className="w-full">
+                                <Image 
+                                src="/logos/google.svg" 
+                                alt="Google" 
+                                width={20} 
+                                height={20} 
+                                className="mr-2"
+                                />
                                 Continue with Google
                             </Button>
                             <FormField
