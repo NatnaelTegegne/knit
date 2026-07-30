@@ -1,8 +1,17 @@
 import { inngest } from '@/inngest/client';
 import { createTRPCRouter, protectedProcedure } from '../init';
 import prisma from '@/lib/db';
+import { google } from '@ai-sdk/google';
+import { generateText } from 'ai';
 
 export const appRouter = createTRPCRouter({
+  testAi: protectedProcedure.mutation(async ({ ctx }) => {
+    const steps = await inngest.send({
+      name: "execute/ai"
+    });
+    
+    return {onSuccess: true, message: "Workflow created" };
+  }),
   // the protectedProcedure is a baseProcedure that checks if the user is authenticated and throws an error if not
   getWorkflows: protectedProcedure.query(({ ctx }) => {
     // console.log({ userId: ctx.auth.user.id}) 
