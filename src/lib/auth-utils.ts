@@ -17,9 +17,9 @@ if (!session) {
 export const requireUnauth = async () => {
   const session = await auth.api.getSession({
     headers: await headers(),
-});
-if (session) {
-  redirect("/");
-}
+  });
+  if (session) {
+    redirect("/workflows");
+  }
   return session;
 };
