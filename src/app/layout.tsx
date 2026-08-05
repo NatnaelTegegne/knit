@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Source_Serif_4, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-// import { TooltipProvider } from "@/components/ui/tooltip";
 import { TRPCReactProvider } from "@/trpc/client";
 import { Toaster } from "sonner";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 
 const fontSans = Inter({
@@ -37,7 +37,9 @@ export default function RootLayout({
          className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable} antialiased`} 
          >
         <TRPCReactProvider>
-          {children}
+          <NuqsAdapter>
+            {children}
+          </NuqsAdapter>
           <Toaster />
         </TRPCReactProvider>
       </body>

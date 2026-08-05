@@ -2,9 +2,16 @@ import { Suspense } from 'react';
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import { prefetchWorkflows } from '@/features/workflows/server/prefetch';
 import { WorkflowsList } from '@/features/workflows/components/workflows-list';
+import { workflowsSearchParamsCache } from '@/features/workflows/params';
+import type { SearchParams } from 'nuqs/server';
 
-export default async function WorkflowsPage() {
-  const queryClient = await prefetchWorkflows();
+interface WorkflowsPageProps {
+  searchParams: Promise<SearchParams>;
+}
+
+export default async function WorkflowsPage({ searchParams }: WorkflowsPageProps) {
+  const params = await workflowsSearchParamsCache.parse(searchParams);
+  const queryClient = await prefetchWorkflows(params);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -25,6 +32,7 @@ function WorkflowsLoading() {
         </div>
         <div className="h-9 w-32 animate-pulse rounded bg-muted" />
       </div>
+      <div className="h-10 w-full animate-pulse rounded bg-muted" />
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-24 animate-pulse rounded-xl border bg-muted" />
