@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -10,13 +10,15 @@ import {
   useEdgesState,
   addEdge,
   type Connection,
-  type Edge,
+  type Node as ReactFlowNode,
   BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { nodeTypes } from '@/config/node-components';
+import { NodeSelector } from './node-selector';
+import { AddNodeButton } from './add-node-button';
 
 interface EditorProps {
   workflowId: string;
@@ -24,6 +26,7 @@ interface EditorProps {
 
 export function Editor({ workflowId }: EditorProps) {
   const trpc = useTRPC();
+  const [selectorOpen, setSelectorOpen] = useState(false);
 
   const { data: workflow } = useSuspenseQuery(
     trpc.workflows.getOne.queryOptions({ id: workflowId })
@@ -37,8 +40,15 @@ export function Editor({ workflowId }: EditorProps) {
     [setEdges]
   );
 
+  const handleAddNode = useCallback(
+    (node: ReactFlowNode) => {
+      setNodes((nds) => [...nds, node]);
+    },
+    [setNodes]
+  );
+
   return (
-    <div className="h-full w-full">
+    <div className="relative h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -54,12 +64,17 @@ export function Editor({ workflowId }: EditorProps) {
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls />
-        <MiniMap
-          nodeStrokeWidth={3}
-          zoomable
-          pannable
-        />
+        <MiniMap nodeStrokeWidth={3} zoomable pannable />
       </ReactFlow>
+
+      <AddNodeButton onClick={() => setSelectorOpen(true)} />
+
+      <NodeSelector
+        open={selectorOpen}
+        onOpenChange={setSelectorOpen}
+        onAddNode={handleAddNode}
+        existingNodes={nodes}
+      />
     </div>
   );
 }

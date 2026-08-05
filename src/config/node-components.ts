@@ -1,7 +1,8 @@
 import type { NodeTypes } from '@xyflow/react';
 import { NodeType } from '@/generated/prisma/enums';
 import { InitialNode } from '@/components/react-flow/initial-node';
-import { PlaceholderNode } from '@/components/react-flow/placeholder-node';
+import { ManualTriggerNode } from '@/features/triggers/components/manual-trigger-node';
+import { HttpRequestNode } from '@/features/executions/components/http-request-node';
 
 // Node type to display name mapping
 export const NODE_TYPE_LABELS: Record<NodeType, string> = {
@@ -26,6 +27,6 @@ export const NODE_CATEGORIES = {
 // Node types registry for React Flow
 export const nodeTypes: NodeTypes = {
   INITIAL: InitialNode,
-  MANUAL_TRIGGER: PlaceholderNode,
-  HTTP_REQUEST: PlaceholderNode,
+  MANUAL_TRIGGER: ManualTriggerNode,
+  HTTP_REQUEST: HttpRequestNode,
 };
