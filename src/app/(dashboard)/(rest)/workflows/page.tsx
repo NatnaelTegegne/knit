@@ -1,25 +1,34 @@
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "lucide-react";
+import { Suspense } from 'react';
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
+import { prefetchWorkflows } from '@/features/workflows/server/prefetch';
+import { WorkflowsList } from '@/features/workflows/components/workflows-list';
 
-export default function WorkflowsPage() {
+export default async function WorkflowsPage() {
+  const queryClient = await prefetchWorkflows();
+
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <Suspense fallback={<WorkflowsLoading />}>
+        <WorkflowsList />
+      </Suspense>
+    </HydrationBoundary>
+  );
+}
+
+function WorkflowsLoading() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Workflows</h1>
-          <p className="text-muted-foreground">
-            Create and manage your automation workflows
-          </p>
+          <div className="h-8 w-32 animate-pulse rounded bg-muted" />
+          <div className="mt-2 h-4 w-64 animate-pulse rounded bg-muted" />
         </div>
-        <Button>
-          <PlusIcon className="mr-2 h-4 w-4" />
-          New Workflow
-        </Button>
+        <div className="h-9 w-32 animate-pulse rounded bg-muted" />
       </div>
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">
-          No workflows yet. Create your first workflow to get started.
-        </p>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-24 animate-pulse rounded-xl border bg-muted" />
+        ))}
       </div>
     </div>
   );
