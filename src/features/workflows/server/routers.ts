@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { generateSlug } from 'random-word-slugs';
 import { TRPCError } from '@trpc/server';
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from '@/config/constants';
+import { mapNodesToReactFlow, mapConnectionsToReactFlow } from '@/features/editor/lib/mapping';
 
 export const workflowsRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -52,6 +53,10 @@ export const workflowsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const workflow = await prisma.workflow.findUnique({
         where: { id: input.id },
+        include: {
+          nodes: true,
+          connections: true,
+        },
       });
 
       if (!workflow) {
@@ -62,7 +67,11 @@ export const workflowsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
-      return workflow;
+      return {
+        ...workflow,
+        nodes: mapNodesToReactFlow(workflow.nodes),
+        edges: mapConnectionsToReactFlow(workflow.connections),
+      };
     }),
 
   create: protectedProcedure.mutation(async ({ ctx }) => {
