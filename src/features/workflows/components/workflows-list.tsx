@@ -4,14 +4,20 @@ import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { PlusIcon, TrashIcon, Loader2Icon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { PlusIcon, TrashIcon, Loader2Icon, SearchIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useWorkflowsSearch } from '../hooks/use-workflows-search';
+import { WorkflowsPagination } from './workflows-pagination';
 
 export function WorkflowsList() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const { search, page, pageSize, onSearchChange, setPage } = useWorkflowsSearch();
 
-  const { data: workflows } = useSuspenseQuery(trpc.workflows.getAll.queryOptions());
+  const { data } = useSuspenseQuery(
+    trpc.workflows.getAll.queryOptions({ page, pageSize, search })
+  );
 
   const createMutation = useMutation(
     trpc.workflows.create.mutationOptions({
@@ -51,46 +57,68 @@ export function WorkflowsList() {
         </Button>
       </div>
 
-      {workflows.length === 0 ? (
+      <div className="relative">
+        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search workflows..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
+      {data.workflows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="text-muted-foreground">
-            No workflows yet. Create your first workflow to get started.
+            {search
+              ? `No workflows found matching "${search}"`
+              : 'No workflows yet. Create your first workflow to get started.'}
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {workflows.map((workflow) => (
-            <Card key={workflow.id}>
-              <CardHeader>
-                <CardTitle>
-                  <Link
-                    href={`/workflows/${workflow.id}`}
-                    className="hover:underline"
-                  >
-                    {workflow.name}
-                  </Link>
-                </CardTitle>
-                <CardDescription>
-                  Created {new Date(workflow.createdAt).toLocaleDateString()}
-                </CardDescription>
-                <CardAction>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => deleteMutation.mutate({ id: workflow.id })}
-                    disabled={deleteMutation.isPending}
-                  >
-                    {deleteMutation.isPending ? (
-                      <Loader2Icon className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <TrashIcon className="h-4 w-4" />
-                    )}
-                  </Button>
-                </CardAction>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {data.workflows.map((workflow) => (
+              <Card key={workflow.id}>
+                <CardHeader>
+                  <CardTitle>
+                    <Link
+                      href={`/workflows/${workflow.id}`}
+                      className="hover:underline"
+                    >
+                      {workflow.name}
+                    </Link>
+                  </CardTitle>
+                  <CardDescription>
+                    Created {new Date(workflow.createdAt).toLocaleDateString()}
+                  </CardDescription>
+                  <CardAction>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => deleteMutation.mutate({ id: workflow.id })}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? (
+                        <Loader2Icon className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <TrashIcon className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </CardAction>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+
+          {data.totalPages > 1 && (
+            <WorkflowsPagination
+              page={data.page}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+            />
+          )}
+        </>
       )}
     </div>
   );

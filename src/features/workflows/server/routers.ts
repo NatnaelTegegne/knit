@@ -3,14 +3,49 @@ import prisma from '@/lib/db';
 import { z } from 'zod';
 import { generateSlug } from 'random-word-slugs';
 import { TRPCError } from '@trpc/server';
+import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from '@/config/constants';
 
 export const workflowsRouter = createTRPCRouter({
-  getAll: protectedProcedure.query(async ({ ctx }) => {
-    return prisma.workflow.findMany({
-      where: { userId: ctx.auth.user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-  }),
+  getAll: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().min(1).default(DEFAULT_PAGE),
+        pageSize: z.number().min(1).max(100).default(DEFAULT_PAGE_SIZE),
+        search: z.string().default(''),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { page, pageSize, search } = input;
+      const skip = (page - 1) * pageSize;
+
+      const where = {
+        userId: ctx.auth.user.id,
+        ...(search && {
+          name: {
+            contains: search,
+            mode: 'insensitive' as const,
+          },
+        }),
+      };
+
+      const [workflows, total] = await Promise.all([
+        prisma.workflow.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: pageSize,
+        }),
+        prisma.workflow.count({ where }),
+      ]);
+
+      return {
+        workflows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      };
+    }),
 
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
