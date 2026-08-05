@@ -13,3 +13,9 @@ export async function prefetchWorkflows(params: WorkflowsParams) {
   await queryClient.prefetchQuery(trpc.workflows.getAll.queryOptions(params));
   return queryClient;
 }
+
+export async function prefetchWorkflow(id: string) {
+  const queryClient = getQueryClient();
+  await queryClient.prefetchQuery(trpc.workflows.getOne.queryOptions({ id }));
+  return queryClient;
+}
