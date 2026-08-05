@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { initTRPC, TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
+import superjson from 'superjson';
  
 /**
  * This context creator accepts `headers` so it can be reused in both
@@ -19,10 +20,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 const t = initTRPC
   .context<Awaited<ReturnType<typeof createTRPCContext>>>()
   .create({
-    /**
-     * @see https://trpc.io/docs/server/data-transformers
-     */
-    // transformer: superjson,
+    transformer: superjson,
   });
  
 // Base router and procedure helpers

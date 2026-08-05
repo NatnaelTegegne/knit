@@ -1,19 +1,38 @@
 'use client';
 
+import { useState } from 'react';
 import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { PlusIcon, TrashIcon, Loader2Icon, SearchIcon } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  EntityContainer,
+  EntityHeader,
+  EntitySearch,
+  EntityList,
+  EntityPagination,
+  EntityEmpty,
+} from '@/components/entity-components';
+import { PlusIcon, TrashIcon, Loader2Icon } from 'lucide-react';
 import Link from 'next/link';
 import { useWorkflowsSearch } from '../hooks/use-workflows-search';
-import { WorkflowsPagination } from './workflows-pagination';
+import { formatDistanceToNow } from 'date-fns';
 
 export function WorkflowsList() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { search, page, pageSize, onSearchChange, setPage } = useWorkflowsSearch();
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data } = useSuspenseQuery(
     trpc.workflows.getAll.queryOptions({ page, pageSize, search })
@@ -31,53 +50,54 @@ export function WorkflowsList() {
     trpc.workflows.delete.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: trpc.workflows.getAll.queryKey() });
+        setDeleteId(null);
       },
     })
   );
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Workflows</h1>
-          <p className="text-muted-foreground">
-            Create and manage your automation workflows
-          </p>
-        </div>
-        <Button
-          onClick={() => createMutation.mutate()}
-          disabled={createMutation.isPending}
-        >
-          {createMutation.isPending ? (
-            <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <PlusIcon className="mr-2 h-4 w-4" />
-          )}
-          New Workflow
-        </Button>
-      </div>
+  const handleDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate({ id: deleteId });
+    }
+  };
 
-      <div className="relative">
-        <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search workflows..."
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9"
-        />
-      </div>
+  return (
+    <EntityContainer>
+      <EntityHeader
+        title="Workflows"
+        description="Create and manage your automation workflows"
+        action={
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <PlusIcon className="mr-2 h-4 w-4" />
+            )}
+            New Workflow
+          </Button>
+        }
+      />
+
+      <EntitySearch
+        value={search}
+        onChange={onSearchChange}
+        placeholder="Search workflows..."
+      />
 
       {data.workflows.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-muted-foreground">
-            {search
+        <EntityEmpty
+          message={
+            search
               ? `No workflows found matching "${search}"`
-              : 'No workflows yet. Create your first workflow to get started.'}
-          </p>
-        </div>
+              : 'No workflows yet. Create your first workflow to get started.'
+          }
+        />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <EntityList>
             {data.workflows.map((workflow) => (
               <Card key={workflow.id}>
                 <CardHeader>
@@ -90,29 +110,24 @@ export function WorkflowsList() {
                     </Link>
                   </CardTitle>
                   <CardDescription>
-                    Created {new Date(workflow.createdAt).toLocaleDateString()}
+                    Updated {formatDistanceToNow(workflow.updatedAt, { addSuffix: true })}
                   </CardDescription>
                   <CardAction>
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => deleteMutation.mutate({ id: workflow.id })}
-                      disabled={deleteMutation.isPending}
+                      onClick={() => setDeleteId(workflow.id)}
                     >
-                      {deleteMutation.isPending ? (
-                        <Loader2Icon className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <TrashIcon className="h-4 w-4" />
-                      )}
+                      <TrashIcon className="h-4 w-4" />
                     </Button>
                   </CardAction>
                 </CardHeader>
               </Card>
             ))}
-          </div>
+          </EntityList>
 
           {data.totalPages > 1 && (
-            <WorkflowsPagination
+            <EntityPagination
               page={data.page}
               totalPages={data.totalPages}
               onPageChange={setPage}
@@ -120,6 +135,32 @@ export function WorkflowsList() {
           )}
         </>
       )}
-    </div>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Workflow</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this workflow? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </EntityContainer>
   );
 }
