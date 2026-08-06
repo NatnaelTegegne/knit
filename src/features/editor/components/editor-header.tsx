@@ -1,13 +1,16 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useAtomValue } from 'jotai';
 import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon } from 'lucide-react';
+import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, SaveIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { editorInstanceAtom, hasUnsavedChangesAtom } from '../store/atoms';
+import { reactFlowNodeToDbNode, reactFlowEdgeToDbConnection } from '../lib/mapping';
 
 interface EditorHeaderProps {
   workflowId: string;
@@ -16,6 +19,8 @@ interface EditorHeaderProps {
 export function EditorHeader({ workflowId }: EditorHeaderProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const editorInstance = useAtomValue(editorInstanceAtom);
+  const hasUnsavedChanges = useAtomValue(hasUnsavedChangesAtom);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,6 +42,18 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
     })
   );
 
+  const saveMutation = useMutation(
+    trpc.workflows.saveCanvas.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.workflows.getOne.queryKey({ id: workflowId }) });
+        toast.success('Workflow saved');
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -49,7 +66,7 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
     setIsEditing(true);
   };
 
-  const handleSave = () => {
+  const handleSaveName = () => {
     if (editName.trim() && editName !== workflow.name) {
       updateMutation.mutate({ id: workflowId, name: editName.trim() });
     } else {
@@ -64,10 +81,35 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSave();
+      handleSaveName();
     } else if (e.key === 'Escape') {
       handleCancel();
     }
+  };
+
+  const handleSaveCanvas = () => {
+    if (!editorInstance) return;
+
+    const nodes = editorInstance.getNodes();
+    const edges = editorInstance.getEdges();
+
+    saveMutation.mutate({
+      id: workflowId,
+      nodes: nodes.map((node) => ({
+        id: node.id,
+        type: node.type as 'INITIAL' | 'MANUAL_TRIGGER' | 'HTTP_REQUEST',
+        positionX: node.position.x,
+        positionY: node.position.y,
+        data: (node.data || {}) as Record<string, unknown>,
+      })),
+      connections: edges.map((edge) => ({
+        id: edge.id,
+        sourceNodeId: edge.source,
+        sourceHandle: edge.sourceHandle || null,
+        targetNodeId: edge.target,
+        targetHandle: edge.targetHandle || null,
+      })),
+    });
   };
 
   return (
@@ -86,14 +128,14 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={handleKeyDown}
-              onBlur={handleSave}
+              onBlur={handleSaveName}
               className="h-8 w-64"
               disabled={updateMutation.isPending}
             />
             <Button
               variant="ghost"
               size="icon-xs"
-              onClick={handleSave}
+              onClick={handleSaveName}
               disabled={updateMutation.isPending}
             >
               {updateMutation.isPending ? (
@@ -123,7 +165,17 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Save button and other actions will be added in later chapters */}
+        <Button
+          onClick={handleSaveCanvas}
+          disabled={saveMutation.isPending}
+        >
+          {saveMutation.isPending ? (
+            <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <SaveIcon className="mr-2 h-4 w-4" />
+          )}
+          Save
+        </Button>
       </div>
     </header>
   );

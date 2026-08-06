@@ -4,6 +4,7 @@ import "./globals.css";
 import { TRPCReactProvider } from "@/trpc/client";
 import { Toaster } from "sonner";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { Provider as JotaiProvider } from "jotai";
 
 
 const fontSans = Inter({
@@ -37,9 +38,11 @@ export default function RootLayout({
          className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable} antialiased`} 
          >
         <TRPCReactProvider>
-          <NuqsAdapter>
-            {children}
-          </NuqsAdapter>
+          <JotaiProvider>
+            <NuqsAdapter>
+              {children}
+            </NuqsAdapter>
+          </JotaiProvider>
           <Toaster />
         </TRPCReactProvider>
       </body>
