@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useSetAtom } from 'jotai';
 import {
   ReactFlow,
   Background,
@@ -11,6 +12,7 @@ import {
   addEdge,
   type Connection,
   type Node as ReactFlowNode,
+  type ReactFlowInstance,
   BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -19,6 +21,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { nodeTypes } from '@/config/node-components';
 import { NodeSelector } from './node-selector';
 import { AddNodeButton } from './add-node-button';
+import { editorInstanceAtom, hasUnsavedChangesAtom } from '../store/atoms';
 
 interface EditorProps {
   workflowId: string;
@@ -26,6 +29,8 @@ interface EditorProps {
 
 export function Editor({ workflowId }: EditorProps) {
   const trpc = useTRPC();
+  const setEditorInstance = useSetAtom(editorInstanceAtom);
+  const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [selectorOpen, setSelectorOpen] = useState(false);
 
   const { data: workflow } = useSuspenseQuery(
@@ -36,15 +41,50 @@ export function Editor({ workflowId }: EditorProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState(workflow.edges);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params: Connection) => {
+      setEdges((eds) => addEdge(params, eds));
+      setHasUnsavedChanges(true);
+    },
+    [setEdges, setHasUnsavedChanges]
+  );
+
+  const handleNodesChange: typeof onNodesChange = useCallback(
+    (changes) => {
+      onNodesChange(changes);
+      // Mark as unsaved if nodes are moved, added, or removed
+      const hasRelevantChange = changes.some(
+        (change) => change.type === 'position' || change.type === 'remove'
+      );
+      if (hasRelevantChange) {
+        setHasUnsavedChanges(true);
+      }
+    },
+    [onNodesChange, setHasUnsavedChanges]
+  );
+
+  const handleEdgesChange: typeof onEdgesChange = useCallback(
+    (changes) => {
+      onEdgesChange(changes);
+      if (changes.some((change) => change.type === 'remove')) {
+        setHasUnsavedChanges(true);
+      }
+    },
+    [onEdgesChange, setHasUnsavedChanges]
   );
 
   const handleAddNode = useCallback(
     (node: ReactFlowNode) => {
       setNodes((nds) => [...nds, node]);
+      setHasUnsavedChanges(true);
     },
-    [setNodes]
+    [setNodes, setHasUnsavedChanges]
+  );
+
+  const onInit = useCallback(
+    (instance: ReactFlowInstance) => {
+      setEditorInstance(instance);
+    },
+    [setEditorInstance]
   );
 
   return (
@@ -52,15 +92,17 @@ export function Editor({ workflowId }: EditorProps) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
+        onInit={onInit}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         defaultEdgeOptions={{
           type: 'smoothstep',
         }}
+        deleteKeyCode={['Backspace', 'Delete']}
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls />
