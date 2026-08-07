@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useAtomValue } from 'jotai';
 import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, PlayIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { editorInstanceAtom, hasUnsavedChangesAtom } from '../store/atoms';
+import { reactFlowNodeToDbNode, reactFlowEdgeToDbConnection } from '../lib/mapping';
 
 interface EditorHeaderProps {
   workflowId: string;
@@ -16,6 +19,8 @@ interface EditorHeaderProps {
 export function EditorHeader({ workflowId }: EditorHeaderProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const editorInstance = useAtomValue(editorInstanceAtom);
+  const hasUnsavedChanges = useAtomValue(hasUnsavedChangesAtom);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +65,7 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
     setIsEditing(true);
   };
 
-  const handleSave = () => {
+  const handleSaveName = () => {
     if (editName.trim() && editName !== workflow.name) {
       updateMutation.mutate({ id: workflowId, name: editName.trim() });
     } else {
@@ -75,7 +80,7 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSave();
+      handleSaveName();
     } else if (e.key === 'Escape') {
       handleCancel();
     }
@@ -101,14 +106,14 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               onKeyDown={handleKeyDown}
-              onBlur={handleSave}
+              onBlur={handleSaveName}
               className="h-8 w-64"
               disabled={updateMutation.isPending}
             />
             <Button
               variant="ghost"
               size="icon-xs"
-              onClick={handleSave}
+              onClick={handleSaveName}
               disabled={updateMutation.isPending}
             >
               {updateMutation.isPending ? (
