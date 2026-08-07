@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, PlayIcon } from 'lucide-react';
+import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, PlayIcon, SaveIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { editorInstanceAtom, hasUnsavedChangesAtom } from '../store/atoms';
@@ -21,6 +21,7 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
   const queryClient = useQueryClient();
   const editorInstance = useAtomValue(editorInstanceAtom);
   const hasUnsavedChanges = useAtomValue(hasUnsavedChangesAtom);
+  const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,6 +36,19 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
         queryClient.invalidateQueries({ queryKey: trpc.workflows.getOne.queryKey({ id: workflowId }) });
         setIsEditing(false);
         toast.success('Workflow name updated');
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
+  const saveMutation = useMutation(
+    trpc.workflows.saveCanvas.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.workflows.getOne.queryKey({ id: workflowId }) });
+        setHasUnsavedChanges(false);
+        toast.success('Workflow saved');
       },
       onError: (error) => {
         toast.error(error.message);
@@ -84,6 +98,19 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
     } else if (e.key === 'Escape') {
       handleCancel();
     }
+  };
+
+  const handleSave = () => {
+    if (!editorInstance) return;
+
+    const nodes = editorInstance.getNodes();
+    const edges = editorInstance.getEdges();
+
+    saveMutation.mutate({
+      id: workflowId,
+      nodes: nodes.map((node) => reactFlowNodeToDbNode(node, workflowId)),
+      connections: edges.map((edge) => reactFlowEdgeToDbConnection(edge, workflowId)),
+    });
   };
 
   const handleExecute = () => {
@@ -143,6 +170,19 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          onClick={handleSave}
+          disabled={saveMutation.isPending || !hasUnsavedChanges}
+          size="sm"
+        >
+          {saveMutation.isPending ? (
+            <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <SaveIcon className="mr-2 h-4 w-4" />
+          )}
+          Save
+        </Button>
         <Button
           onClick={handleExecute}
           disabled={executeMutation.isPending}

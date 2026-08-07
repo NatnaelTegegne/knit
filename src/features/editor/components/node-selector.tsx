@@ -14,6 +14,7 @@ import { NODE_TYPE_LABELS, NODE_TYPE_DESCRIPTIONS, NODE_CATEGORIES } from '@/con
 import { PlayIcon, GlobeIcon } from 'lucide-react';
 import type { Node as ReactFlowNode } from '@xyflow/react';
 import { createId } from '@paralleldrive/cuid2';
+import { generateVariableName } from '../lib/variables';
 
 interface NodeSelectorProps {
   open: boolean;
@@ -47,11 +48,14 @@ export function NodeSelector({
         ? { x: lastNode.position.x + 300, y: lastNode.position.y }
         : { x: 100, y: 100 };
 
+      // Generate a unique variable name for this node
+      const variableName = generateVariableName(type, existingNodes);
+
       const newNode: ReactFlowNode = {
         id: createId(),
         type,
         position,
-        data: {},
+        data: { variableName },
       };
 
       onAddNode(newNode);
