@@ -13,6 +13,17 @@ type ExecuteWorkflowEvent = {
   };
 };
 
+// Base node data interface for extracting variable name
+interface BaseNodeData {
+  variableName?: string;
+}
+
+// Get the context key for a node (variable name or fallback to node ID)
+function getContextKey(node: { id: string; data: unknown }): string {
+  const data = node.data as BaseNodeData;
+  return data.variableName || node.id;
+}
+
 // Execute a workflow
 export const executeWorkflow = inngest.createFunction(
   {
@@ -49,20 +60,27 @@ export const executeWorkflow = inngest.createFunction(
       return topologicalSort(workflow.nodes, workflow.connections);
     });
 
-    // Create execution context
-    const context = createExecutionContext(workflowId, userId);
-
-    // Execute each node in order
+    // Execute each node in order, accumulating results
+    // Results are stored by variable name (or node ID as fallback)
     const results: Record<string, unknown> = {};
 
     for (const node of sortedNodes) {
+      // Create a fresh context for each step with accumulated results
+      // This is necessary because Inngest serializes state between steps
+      const context = createExecutionContext(workflowId, userId);
+
+      // Restore previous outputs to the context
+      for (const [key, value] of Object.entries(results)) {
+        context.setOutput(key, value);
+      }
+
       const output = await step.run(`execute-${node.type}-${node.id}`, async () => {
         return executeNode(node, context);
       });
 
-      results[node.id] = output;
-      // Update context for subsequent nodes
-      context.setOutput(node.id, output);
+      // Store result using variable name as key
+      const contextKey = getContextKey(node);
+      results[contextKey] = output;
     }
 
     return {

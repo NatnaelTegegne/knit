@@ -1,19 +1,46 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { BaseExecutionNode } from '@/components/react-flow/base-execution-node';
 import { GlobeIcon } from 'lucide-react';
+import { HttpRequestDialog } from './http-request-dialog';
+
+interface HttpRequestData {
+  variableName?: string;
+  method?: string;
+  url?: string;
+}
 
 export const HttpRequestNode = memo(function HttpRequestNode({
+  id,
   selected,
+  data,
 }: NodeProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const nodeData = data as HttpRequestData;
+
+  // Show configured URL or default description
+  const description = nodeData.url
+    ? `${nodeData.method || 'GET'} ${new URL(nodeData.url).hostname}`
+    : 'Click to configure';
+
   return (
-    <BaseExecutionNode
-      selected={selected}
-      icon={<GlobeIcon className="h-5 w-5 text-muted-foreground" />}
-      label="HTTP Request"
-      description="Make API call"
-    />
+    <>
+      <div onDoubleClick={() => setDialogOpen(true)}>
+        <BaseExecutionNode
+          selected={selected}
+          icon={<GlobeIcon className="h-5 w-5 text-muted-foreground" />}
+          label={nodeData.variableName || 'HTTP Request'}
+          description={description}
+        />
+      </div>
+
+      <HttpRequestDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        nodeId={id}
+      />
+    </>
   );
 });

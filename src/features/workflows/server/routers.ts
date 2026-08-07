@@ -129,6 +129,88 @@ export const workflowsRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  saveCanvas: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        nodes: z.array(
+          z.object({
+            id: z.string(),
+            type: z.enum(['INITIAL', 'MANUAL_TRIGGER', 'HTTP_REQUEST'] as const),
+            positionX: z.number(),
+            positionY: z.number(),
+            data: z.record(z.string(), z.unknown()),
+          })
+        ),
+        connections: z.array(
+          z.object({
+            id: z.string(),
+            sourceNodeId: z.string(),
+            sourceHandle: z.string().nullable(),
+            targetNodeId: z.string(),
+            targetHandle: z.string().nullable(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const workflow = await prisma.workflow.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!workflow) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Workflow not found' });
+      }
+
+      if (workflow.userId !== ctx.auth.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      // Use a transaction to update nodes and connections atomically
+      await prisma.$transaction(async (tx) => {
+        // Delete existing nodes (connections cascade)
+        await tx.node.deleteMany({
+          where: { workflowId: input.id },
+        });
+
+        // Create new nodes
+        if (input.nodes.length > 0) {
+          await tx.node.createMany({
+            data: input.nodes.map((node) => ({
+              id: node.id,
+              type: node.type,
+              positionX: node.positionX,
+              positionY: node.positionY,
+              data: node.data as object,
+              workflowId: input.id,
+            })),
+          });
+        }
+
+        // Create new connections
+        if (input.connections.length > 0) {
+          await tx.connection.createMany({
+            data: input.connections.map((conn) => ({
+              id: conn.id,
+              sourceNodeId: conn.sourceNodeId,
+              sourceHandle: conn.sourceHandle,
+              targetNodeId: conn.targetNodeId,
+              targetHandle: conn.targetHandle,
+              workflowId: input.id,
+            })),
+          });
+        }
+
+        // Update workflow timestamp
+        await tx.workflow.update({
+          where: { id: input.id },
+          data: { updatedAt: new Date() },
+        });
+      });
+
+      return { success: true };
+    }),
+
   execute: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {

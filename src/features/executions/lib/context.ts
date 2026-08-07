@@ -4,14 +4,17 @@ export interface ExecutionContext {
   workflowId: string;
   userId: string;
 
-  // Node outputs stored by node ID
+  // Node outputs stored by variable name (or node ID as fallback)
   nodeOutputs: Record<string, unknown>;
 
-  // Add output from a node
-  setOutput: (nodeId: string, output: unknown) => void;
+  // Add output from a node using its variable name
+  setOutput: (key: string, output: unknown) => void;
 
-  // Get output from a previous node
-  getOutput: (nodeId: string) => unknown;
+  // Get output from a previous node by variable name
+  getOutput: (key: string) => unknown;
+
+  // Get all outputs (for templating)
+  getAllOutputs: () => Record<string, unknown>;
 }
 
 export function createExecutionContext(
@@ -24,11 +27,12 @@ export function createExecutionContext(
     workflowId,
     userId,
     nodeOutputs,
-    setOutput: (nodeId: string, output: unknown) => {
-      nodeOutputs[nodeId] = output;
+    setOutput: (key: string, output: unknown) => {
+      nodeOutputs[key] = output;
     },
-    getOutput: (nodeId: string) => {
-      return nodeOutputs[nodeId];
+    getOutput: (key: string) => {
+      return nodeOutputs[key];
     },
+    getAllOutputs: () => ({ ...nodeOutputs }),
   };
 }
