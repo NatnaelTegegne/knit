@@ -5,7 +5,7 @@ import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon } from 'lucide-react';
+import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, PlayIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -30,6 +30,17 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
         queryClient.invalidateQueries({ queryKey: trpc.workflows.getOne.queryKey({ id: workflowId }) });
         setIsEditing(false);
         toast.success('Workflow name updated');
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
+  const executeMutation = useMutation(
+    trpc.workflows.execute.mutationOptions({
+      onSuccess: () => {
+        toast.success('Workflow execution started');
       },
       onError: (error) => {
         toast.error(error.message);
@@ -68,6 +79,10 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
     } else if (e.key === 'Escape') {
       handleCancel();
     }
+  };
+
+  const handleExecute = () => {
+    executeMutation.mutate({ id: workflowId });
   };
 
   return (
@@ -123,7 +138,18 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Save button and other actions will be added in later chapters */}
+        <Button
+          onClick={handleExecute}
+          disabled={executeMutation.isPending}
+          size="sm"
+        >
+          {executeMutation.isPending ? (
+            <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <PlayIcon className="mr-2 h-4 w-4" />
+          )}
+          Execute
+        </Button>
       </div>
     </header>
   );

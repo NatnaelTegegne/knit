@@ -5,6 +5,7 @@ import { generateSlug } from 'random-word-slugs';
 import { TRPCError } from '@trpc/server';
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from '@/config/constants';
 import { mapNodesToReactFlow, mapConnectionsToReactFlow } from '@/features/editor/lib/mapping';
+import { inngest } from '@/inngest/client';
 
 export const workflowsRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -126,5 +127,37 @@ export const workflowsRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  execute: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const workflow = await prisma.workflow.findUnique({
+        where: { id: input.id },
+        include: { nodes: true },
+      });
+
+      if (!workflow) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Workflow not found' });
+      }
+
+      if (workflow.userId !== ctx.auth.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
+      }
+
+      if (workflow.nodes.length === 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Workflow has no nodes to execute' });
+      }
+
+      // Send event to Inngest to execute the workflow
+      await inngest.send({
+        name: 'workflow/execute',
+        data: {
+          workflowId: workflow.id,
+          userId: ctx.auth.user.id,
+        },
+      });
+
+      return { success: true, workflowId: workflow.id };
     }),
 });
