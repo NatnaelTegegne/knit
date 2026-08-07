@@ -1,46 +1,77 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
-import { generateText } from "ai";
 import { inngest } from "./client";
+import prisma from "@/lib/db";
+import { topologicalSort } from "@/features/executions/lib/topological-sort";
+import { createExecutionContext } from "@/features/executions/lib/context";
+import { executeNode } from "@/features/executions/lib/executors";
 
-const google = createGoogleGenerativeAI();
-const openai = createOpenAI();
-const anthropic = createAnthropic();
+// Define event types
+type ExecuteWorkflowEvent = {
+  name: "workflow/execute";
+  data: {
+    workflowId: string;
+    userId: string;
+  };
+};
 
-export const execute = inngest.createFunction(
+// Execute a workflow
+export const executeWorkflow = inngest.createFunction(
   {
-    id: "execute-ai",
-    retries: 2,
-    triggers: { event: "execute/ai" },
+    id: "execute-workflow",
+    retries: 0, // Don't retry failed executions automatically
+    triggers: [{ event: "workflow/execute" }],
   },
-  async ({ step }) => {
-    const options = {
-      system: "You are a helpful assistant.",
-      prompt: "What is 2 + 2? Answer with just the number.",
-      experimental_telemetry: { isEnabled: true },
-    } as const;
+  async ({ event, step }: { event: ExecuteWorkflowEvent; step: any }) => {
+    const { workflowId, userId } = event.data;
 
-    const googleResult = await step.ai.wrap(
-      "gemini-generate-text",
-      generateText,
-      { ...options, model: google("gemini-2.5-flash") },
-    );
-    const openaiResult = await step.ai.wrap(
-      "openai-generate-text",
-      generateText,
-      { ...options, model: openai("gpt-4o-mini") },
-    );
-    const anthropicResult = await step.ai.wrap(
-      "anthropic-generate-text",
-      generateText,
-      { ...options, model: anthropic("claude-3-5-sonnet-latest") },
-    );
+    // Fetch workflow with nodes and connections
+    const workflow = await step.run("fetch-workflow", async () => {
+      const wf = await prisma.workflow.findUnique({
+        where: { id: workflowId },
+        include: {
+          nodes: true,
+          connections: true,
+        },
+      });
+
+      if (!wf) {
+        throw new Error(`Workflow ${workflowId} not found`);
+      }
+
+      if (wf.userId !== userId) {
+        throw new Error("Not authorized to execute this workflow");
+      }
+
+      return wf;
+    });
+
+    // Sort nodes topologically
+    const sortedNodes = await step.run("sort-nodes", async () => {
+      return topologicalSort(workflow.nodes, workflow.connections);
+    });
+
+    // Create execution context
+    const context = createExecutionContext(workflowId, userId);
+
+    // Execute each node in order
+    const results: Record<string, unknown> = {};
+
+    for (const node of sortedNodes) {
+      const output = await step.run(`execute-${node.type}-${node.id}`, async () => {
+        return executeNode(node, context);
+      });
+
+      results[node.id] = output;
+      // Update context for subsequent nodes
+      context.setOutput(node.id, output);
+    }
 
     return {
-      google: googleResult.text,
-      openai: openaiResult.text,
-      anthropic: anthropicResult.text,
+      workflowId,
+      executedNodes: sortedNodes.length,
+      results,
     };
-  },
+  }
 );
+
+// Export all functions for Inngest serve
+export const functions = [executeWorkflow];

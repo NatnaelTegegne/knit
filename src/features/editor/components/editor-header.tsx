@@ -6,7 +6,7 @@ import { useTRPC } from '@/trpc/client';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, SaveIcon } from 'lucide-react';
+import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, PlayIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { editorInstanceAtom, hasUnsavedChangesAtom } from '../store/atoms';
@@ -42,11 +42,10 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
     })
   );
 
-  const saveMutation = useMutation(
-    trpc.workflows.saveCanvas.mutationOptions({
+  const executeMutation = useMutation(
+    trpc.workflows.execute.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.workflows.getOne.queryKey({ id: workflowId }) });
-        toast.success('Workflow saved');
+        toast.success('Workflow execution started');
       },
       onError: (error) => {
         toast.error(error.message);
@@ -87,29 +86,8 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
     }
   };
 
-  const handleSaveCanvas = () => {
-    if (!editorInstance) return;
-
-    const nodes = editorInstance.getNodes();
-    const edges = editorInstance.getEdges();
-
-    saveMutation.mutate({
-      id: workflowId,
-      nodes: nodes.map((node) => ({
-        id: node.id,
-        type: node.type as 'INITIAL' | 'MANUAL_TRIGGER' | 'HTTP_REQUEST',
-        positionX: node.position.x,
-        positionY: node.position.y,
-        data: (node.data || {}) as Record<string, unknown>,
-      })),
-      connections: edges.map((edge) => ({
-        id: edge.id,
-        sourceNodeId: edge.source,
-        sourceHandle: edge.sourceHandle || null,
-        targetNodeId: edge.target,
-        targetHandle: edge.targetHandle || null,
-      })),
-    });
+  const handleExecute = () => {
+    executeMutation.mutate({ id: workflowId });
   };
 
   return (
@@ -166,15 +144,16 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
 
       <div className="flex items-center gap-2">
         <Button
-          onClick={handleSaveCanvas}
-          disabled={saveMutation.isPending}
+          onClick={handleExecute}
+          disabled={executeMutation.isPending}
+          size="sm"
         >
-          {saveMutation.isPending ? (
+          {executeMutation.isPending ? (
             <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
           ) : (
-            <SaveIcon className="mr-2 h-4 w-4" />
+            <PlayIcon className="mr-2 h-4 w-4" />
           )}
-          Save
+          Execute
         </Button>
       </div>
     </header>

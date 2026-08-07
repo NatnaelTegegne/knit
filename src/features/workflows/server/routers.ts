@@ -5,25 +5,7 @@ import { generateSlug } from 'random-word-slugs';
 import { TRPCError } from '@trpc/server';
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from '@/config/constants';
 import { mapNodesToReactFlow, mapConnectionsToReactFlow } from '@/features/editor/lib/mapping';
-import { NodeType } from '@/generated/prisma/enums';
-
-const nodeTypeValues = ['INITIAL', 'MANUAL_TRIGGER', 'HTTP_REQUEST'] as const;
-
-const nodeSchema = z.object({
-  id: z.string(),
-  type: z.enum(nodeTypeValues),
-  positionX: z.number(),
-  positionY: z.number(),
-  data: z.record(z.string(), z.unknown()).default({}),
-});
-
-const connectionSchema = z.object({
-  id: z.string(),
-  sourceNodeId: z.string(),
-  sourceHandle: z.string().nullable(),
-  targetNodeId: z.string(),
-  targetHandle: z.string().nullable(),
-});
+import { inngest } from '@/inngest/client';
 
 export const workflowsRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -147,17 +129,12 @@ export const workflowsRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  saveCanvas: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        nodes: z.array(nodeSchema),
-        connections: z.array(connectionSchema),
-      })
-    )
+  execute: protectedProcedure
+    .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const workflow = await prisma.workflow.findUnique({
         where: { id: input.id },
+        include: { nodes: true },
       });
 
       if (!workflow) {
@@ -168,48 +145,19 @@ export const workflowsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
-      // Transactional update: delete old nodes (cascades to connections), then recreate
-      await prisma.$transaction(async (tx) => {
-        // Delete all existing nodes (connections cascade delete)
-        await tx.node.deleteMany({
-          where: { workflowId: input.id },
-        });
+      if (workflow.nodes.length === 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Workflow has no nodes to execute' });
+      }
 
-        // Create new nodes
-        if (input.nodes.length > 0) {
-          await tx.node.createMany({
-            data: input.nodes.map((node) => ({
-              id: node.id,
-              type: node.type as NodeType,
-              positionX: node.positionX,
-              positionY: node.positionY,
-              data: node.data as object,
-              workflowId: input.id,
-            })),
-          });
-        }
-
-        // Create new connections
-        if (input.connections.length > 0) {
-          await tx.connection.createMany({
-            data: input.connections.map((conn) => ({
-              id: conn.id,
-              sourceNodeId: conn.sourceNodeId,
-              sourceHandle: conn.sourceHandle,
-              targetNodeId: conn.targetNodeId,
-              targetHandle: conn.targetHandle,
-              workflowId: input.id,
-            })),
-          });
-        }
-
-        // Update workflow timestamp
-        await tx.workflow.update({
-          where: { id: input.id },
-          data: { updatedAt: new Date() },
-        });
+      // Send event to Inngest to execute the workflow
+      await inngest.send({
+        name: 'workflow/execute',
+        data: {
+          workflowId: workflow.id,
+          userId: ctx.auth.user.id,
+        },
       });
 
-      return { success: true };
+      return { success: true, workflowId: workflow.id };
     }),
 });
