@@ -5,6 +5,7 @@ import type { Node as ReactFlowNode } from '@xyflow/react';
 const VARIABLE_PREFIXES: Record<NodeType, string> = {
   [NodeType.INITIAL]: 'initial',
   [NodeType.MANUAL_TRIGGER]: 'trigger',
+  [NodeType.GOOGLE_FORM_TRIGGER]: 'formResponse',
   [NodeType.HTTP_REQUEST]: 'httpResponse',
 };
 

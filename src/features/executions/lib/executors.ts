@@ -47,6 +47,27 @@ const executeManualTrigger: NodeExecutor = async (node, context) => {
   return { triggered: true, timestamp: new Date().toISOString() };
 };
 
+// Execute GOOGLE_FORM_TRIGGER node
+const executeGoogleFormTrigger: NodeExecutor = async (node, context) => {
+  // Return the form response data from the trigger
+  const triggerData = context.triggerData;
+
+  if (!triggerData || triggerData.type !== 'google-form') {
+    // If not triggered by a form submission, return empty data
+    return {
+      triggered: false,
+      message: 'Not triggered by Google Form submission',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  return {
+    triggered: true,
+    formResponse: triggerData.formResponse,
+    timestamp: triggerData.timestamp,
+  };
+};
+
 // Validate HTTP Request required fields (after interpolation)
 function validateHttpRequestUrl(url: string): void {
   if (!url || url.trim() === '') {
@@ -123,6 +144,7 @@ const executeHttpRequest: NodeExecutor = async (node, context) => {
 const executors: Record<NodeType, NodeExecutor> = {
   [NodeType.INITIAL]: executeInitial,
   [NodeType.MANUAL_TRIGGER]: executeManualTrigger,
+  [NodeType.GOOGLE_FORM_TRIGGER]: executeGoogleFormTrigger,
   [NodeType.HTTP_REQUEST]: executeHttpRequest,
 };
 

@@ -136,7 +136,7 @@ export const workflowsRouter = createTRPCRouter({
         nodes: z.array(
           z.object({
             id: z.string(),
-            type: z.enum(['INITIAL', 'MANUAL_TRIGGER', 'HTTP_REQUEST'] as const),
+            type: z.enum(['INITIAL', 'MANUAL_TRIGGER', 'GOOGLE_FORM_TRIGGER', 'HTTP_REQUEST'] as const),
             positionX: z.number(),
             positionY: z.number(),
             data: z.record(z.string(), z.unknown()),
