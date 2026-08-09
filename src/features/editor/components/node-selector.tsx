@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { NodeType } from '@/generated/prisma/enums';
 import { NODE_TYPE_LABELS, NODE_TYPE_DESCRIPTIONS, NODE_CATEGORIES } from '@/config/node-components';
-import { PlayIcon, GlobeIcon } from 'lucide-react';
+import { PlayIcon, GlobeIcon, FileSpreadsheetIcon } from 'lucide-react';
 import type { Node as ReactFlowNode } from '@xyflow/react';
 import { createId } from '@paralleldrive/cuid2';
 import { generateVariableName } from '../lib/variables';
@@ -26,6 +26,7 @@ interface NodeSelectorProps {
 const NODE_ICONS: Record<NodeType, React.ReactNode> = {
   [NodeType.INITIAL]: <PlayIcon className="h-5 w-5" />,
   [NodeType.MANUAL_TRIGGER]: <PlayIcon className="h-5 w-5 text-primary" />,
+  [NodeType.GOOGLE_FORM_TRIGGER]: <FileSpreadsheetIcon className="h-5 w-5 text-green-600" />,
   [NodeType.HTTP_REQUEST]: <GlobeIcon className="h-5 w-5" />,
 };
 
@@ -35,9 +36,12 @@ export function NodeSelector({
   onAddNode,
   existingNodes,
 }: NodeSelectorProps) {
-  // Check if manual trigger already exists (only one allowed per workflow)
+  // Check if triggers already exist (only one of each type allowed per workflow)
   const hasManualTrigger = existingNodes.some(
     (node) => node.type === NodeType.MANUAL_TRIGGER
+  );
+  const hasGoogleFormTrigger = existingNodes.some(
+    (node) => node.type === NodeType.GOOGLE_FORM_TRIGGER
   );
 
   const handleAddNode = useCallback(
@@ -87,7 +91,10 @@ export function NodeSelector({
                   variant="outline"
                   className="w-full justify-start gap-3 h-auto py-3"
                   onClick={() => handleAddNode(type)}
-                  disabled={type === NodeType.MANUAL_TRIGGER && hasManualTrigger}
+                  disabled={
+                    (type === NodeType.MANUAL_TRIGGER && hasManualTrigger) ||
+                    (type === NodeType.GOOGLE_FORM_TRIGGER && hasGoogleFormTrigger)
+                  }
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
                     {NODE_ICONS[type]}
@@ -95,7 +102,8 @@ export function NodeSelector({
                   <div className="text-left">
                     <div className="font-medium">{NODE_TYPE_LABELS[type]}</div>
                     <div className="text-xs text-muted-foreground">
-                      {type === NodeType.MANUAL_TRIGGER && hasManualTrigger
+                      {(type === NodeType.MANUAL_TRIGGER && hasManualTrigger) ||
+                      (type === NodeType.GOOGLE_FORM_TRIGGER && hasGoogleFormTrigger)
                         ? 'Already added (only one allowed)'
                         : NODE_TYPE_DESCRIPTIONS[type]}
                     </div>

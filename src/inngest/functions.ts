@@ -4,12 +4,20 @@ import { topologicalSort } from "@/features/executions/lib/topological-sort";
 import { createExecutionContext } from "@/features/executions/lib/context";
 import { executeNode } from "@/features/executions/lib/executors";
 
+// Trigger data from webhooks
+interface TriggerData {
+  type: string;
+  formResponse?: unknown;
+  timestamp: string;
+}
+
 // Define event types
 type ExecuteWorkflowEvent = {
   name: "workflow/execute";
   data: {
     workflowId: string;
     userId: string;
+    triggerData?: TriggerData;
   };
 };
 
@@ -32,7 +40,7 @@ export const executeWorkflow = inngest.createFunction(
     triggers: [{ event: "workflow/execute" }],
   },
   async ({ event, step }: { event: ExecuteWorkflowEvent; step: any }) => {
-    const { workflowId, userId } = event.data;
+    const { workflowId, userId, triggerData } = event.data;
 
     // Fetch workflow with nodes and connections
     const workflow = await step.run("fetch-workflow", async () => {
@@ -67,7 +75,7 @@ export const executeWorkflow = inngest.createFunction(
     for (const node of sortedNodes) {
       // Create a fresh context for each step with accumulated results
       // This is necessary because Inngest serializes state between steps
-      const context = createExecutionContext(workflowId, userId);
+      const context = createExecutionContext(workflowId, userId, triggerData);
 
       // Restore previous outputs to the context
       for (const [key, value] of Object.entries(results)) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useSetAtom } from 'jotai';
 import {
   ReactFlow,
@@ -21,7 +21,8 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { nodeTypes } from '@/config/node-components';
 import { NodeSelector } from './node-selector';
 import { AddNodeButton } from './add-node-button';
-import { editorInstanceAtom, hasUnsavedChangesAtom } from '../store/atoms';
+import { editorInstanceAtom, hasUnsavedChangesAtom, nodeStatusesAtom } from '../store/atoms';
+import { useNodeStatus } from '@/features/executions/hooks/use-node-status';
 
 interface EditorProps {
   workflowId: string;
@@ -31,11 +32,20 @@ export function Editor({ workflowId }: EditorProps) {
   const trpc = useTRPC();
   const setEditorInstance = useSetAtom(editorInstanceAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
+  const setNodeStatuses = useSetAtom(nodeStatusesAtom);
   const [selectorOpen, setSelectorOpen] = useState(false);
 
   const { data: workflow } = useSuspenseQuery(
     trpc.workflows.getOne.queryOptions({ id: workflowId })
   );
+
+  // Subscribe to real-time node status updates
+  const { statuses } = useNodeStatus({ workflowId });
+
+  // Sync statuses to atom for node components to consume
+  useEffect(() => {
+    setNodeStatuses(statuses);
+  }, [statuses, setNodeStatuses]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(workflow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(workflow.edges);

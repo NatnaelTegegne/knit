@@ -1,8 +1,18 @@
+// Trigger data from webhooks
+export interface TriggerData {
+  type: string;
+  formResponse?: unknown;
+  timestamp: string;
+}
+
 // Execution context shared between nodes during workflow execution
 export interface ExecutionContext {
   // Workflow metadata
   workflowId: string;
   userId: string;
+
+  // Trigger data (for webhook-triggered workflows)
+  triggerData?: TriggerData;
 
   // Node outputs stored by variable name (or node ID as fallback)
   nodeOutputs: Record<string, unknown>;
@@ -19,13 +29,15 @@ export interface ExecutionContext {
 
 export function createExecutionContext(
   workflowId: string,
-  userId: string
+  userId: string,
+  triggerData?: TriggerData
 ): ExecutionContext {
   const nodeOutputs: Record<string, unknown> = {};
 
   return {
     workflowId,
     userId,
+    triggerData,
     nodeOutputs,
     setOutput: (key: string, output: unknown) => {
       nodeOutputs[key] = output;
