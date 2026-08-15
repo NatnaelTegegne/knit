@@ -24,8 +24,8 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
+import { SocialAuthButtons, type SocialProvider } from "./social-auth-buttons";
 
 const registerSchema = z.object({
     email: z.email({ message: "Please enter a valid email address" }),
@@ -38,7 +38,11 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export function RegisterForm() {
+interface RegisterFormProps {
+    socialProviders: SocialProvider[];
+}
+
+export function RegisterForm({ socialProviders }: RegisterFormProps) {
     const router = useRouter();
     const form = useForm<RegisterFormValues>({
         resolver: zodResolver(registerSchema),
@@ -81,26 +85,10 @@ export function RegisterForm() {
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <Button variant="outline" className="w-full">
-                                <Image 
-                                src="/logos/github.svg" 
-                                alt="GitHub" 
-                                width={20} 
-                                height={20} 
-                                className="mr-2"
-                                />
-                                Continue with GitHub
-                            </Button>
-                            <Button variant="outline" className="w-full">
-                                <Image 
-                                src="/logos/google.svg" 
-                                alt="Google" 
-                                width={20} 
-                                height={20} 
-                                className="mr-2"
-                                />
-                                Continue with Google
-                            </Button>
+                            <SocialAuthButtons
+                                providers={socialProviders}
+                                disabled={isPending}
+                            />
                             <FormField
                                 name="email"
                                 render={({ field }) => (

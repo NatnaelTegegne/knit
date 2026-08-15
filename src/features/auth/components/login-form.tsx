@@ -1,8 +1,7 @@
 "use client"
 
-import { zodResolver } from "@hookform/resolvers/zod"; 
-import Image from "next/image"; 
-import Link from "next/link"; 
+import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRouter } from "next/navigation"; 
 import { useForm } from "react-hook-form"; 
 import { toast } from "sonner"; 
@@ -24,9 +23,8 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-// import { authClient } from "@/lib/auth";
-import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
+import { SocialAuthButtons, type SocialProvider } from "./social-auth-buttons";
 
 const loginSchema = z.object({
     email: z.email({ message: "Please enter a valid email address" }),
@@ -35,7 +33,11 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+interface LoginFormProps {
+    socialProviders: SocialProvider[];
+}
+
+export function LoginForm({ socialProviders }: LoginFormProps) {
     const router = useRouter();
     const form = useForm<LoginFormValues>({
         resolver: zodResolver(loginSchema),
@@ -45,13 +47,17 @@ export function LoginForm() {
         },
     });
     const onSubmit = async (values: LoginFormValues) => {
-        try {
-            await authClient.signIn.email(values);
-            toast.success("Logged in successfully");
-            router.push("/");
-        } catch (error) {
-            toast.error("Failed to log in");
-        }
+        // Better Auth resolves with an `error` rather than throwing, so a
+        // try/catch here would report success on a rejected login.
+        await authClient.signIn.email(values, {
+            onSuccess: () => {
+                toast.success("Logged in successfully");
+                router.push("/workflows");
+            },
+            onError: (ctx) => {
+                toast.error(ctx.error.message || "Failed to log in");
+            },
+        });
     };
     const isPending = form.formState.isSubmitting;
 
@@ -67,26 +73,10 @@ export function LoginForm() {
                 <CardContent>
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                            <Button variant="outline" className="w-full">
-                                <Image 
-                                src="/logos/github.svg" 
-                                alt="GitHub" 
-                                width={20} 
-                                height={20} 
-                                className="mr-2"
-                                />
-                                Continue with GitHub
-                            </Button>
-                            <Button variant="outline" className="w-full">
-                                <Image 
-                                src="/logos/google.svg" 
-                                alt="Google" 
-                                width={20} 
-                                height={20} 
-                                className="mr-2"
-                                />
-                                Continue with Google
-                            </Button>
+                            <SocialAuthButtons
+                                providers={socialProviders}
+                                disabled={isPending}
+                            />
                             <FormField
                                 name="email"
                                 render={({ field }) => (
