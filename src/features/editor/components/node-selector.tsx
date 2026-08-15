@@ -11,10 +11,27 @@ import {
 import { Button } from '@/components/ui/button';
 import { NodeType } from '@/generated/prisma/enums';
 import { NODE_TYPE_LABELS, NODE_TYPE_DESCRIPTIONS, NODE_CATEGORIES } from '@/config/node-components';
-import { PlayIcon, GlobeIcon, FileSpreadsheetIcon, CreditCardIcon } from 'lucide-react';
+import {
+  PlayIcon,
+  GlobeIcon,
+  FileSpreadsheetIcon,
+  CreditCardIcon,
+  SparklesIcon,
+  BotIcon,
+  BrainIcon,
+  MessageSquareIcon,
+  HashIcon,
+} from 'lucide-react';
 import type { Node as ReactFlowNode } from '@xyflow/react';
 import { createId } from '@paralleldrive/cuid2';
 import { generateVariableName } from '../lib/variables';
+
+const SECTIONS = [
+  { key: 'triggers', title: 'Triggers' },
+  { key: 'actions', title: 'Actions' },
+  { key: 'ai', title: 'AI' },
+  { key: 'messaging', title: 'Messaging' },
+] as const;
 
 interface NodeSelectorProps {
   open: boolean;
@@ -29,6 +46,11 @@ const NODE_ICONS: Record<NodeType, React.ReactNode> = {
   [NodeType.GOOGLE_FORM_TRIGGER]: <FileSpreadsheetIcon className="h-5 w-5 text-purple-600" />,
   [NodeType.STRIPE_TRIGGER]: <CreditCardIcon className="h-5 w-5 text-indigo-600" />,
   [NodeType.HTTP_REQUEST]: <GlobeIcon className="h-5 w-5" />,
+  [NodeType.OPENAI]: <SparklesIcon className="h-5 w-5 text-emerald-600" />,
+  [NodeType.ANTHROPIC]: <BotIcon className="h-5 w-5 text-orange-600" />,
+  [NodeType.GOOGLE_GEMINI]: <BrainIcon className="h-5 w-5 text-blue-600" />,
+  [NodeType.DISCORD]: <MessageSquareIcon className="h-5 w-5 text-indigo-500" />,
+  [NodeType.SLACK]: <HashIcon className="h-5 w-5 text-rose-500" />,
 };
 
 export function NodeSelector({
@@ -75,63 +97,50 @@ export function NodeSelector({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-6">
-          {/* Triggers Section */}
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-              Triggers
-            </h3>
-            <div className="space-y-2">
-              {NODE_CATEGORIES.triggers.map((type) => (
-                <Button
-                  key={type}
-                  variant="outline"
-                  className="w-full justify-start gap-3 h-auto py-3"
-                  onClick={() => handleAddNode(type)}
-                  disabled={hasTrigger(type)}
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-                    {NODE_ICONS[type]}
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium">{NODE_TYPE_LABELS[type]}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {hasTrigger(type)
-                        ? 'Already added (only one allowed)'
-                        : NODE_TYPE_DESCRIPTIONS[type]}
-                    </div>
-                  </div>
-                </Button>
-              ))}
-            </div>
-          </div>
+        {/* Sections render from NODE_CATEGORIES, so a new node type only needs
+            adding there rather than another block here. */}
+        <div className="mt-4 space-y-6 overflow-y-auto pb-4">
+          {SECTIONS.map(({ key, title }) => (
+            <div key={key}>
+              <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+                {title}
+              </h3>
+              <div className="space-y-2">
+                {NODE_CATEGORIES[key].map((type) => {
+                  // Only triggers are limited to one per workflow
+                  const isTakenTrigger = key === 'triggers' && hasTrigger(type);
 
-          {/* Actions Section */}
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-              Actions
-            </h3>
-            <div className="space-y-2">
-              {NODE_CATEGORIES.actions.map((type) => (
-                <Button
-                  key={type}
-                  variant="outline"
-                  className="w-full justify-start gap-3 h-auto py-3"
-                  onClick={() => handleAddNode(type)}
-                >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-secondary">
-                    {NODE_ICONS[type]}
-                  </div>
-                  <div className="text-left">
-                    <div className="font-medium">{NODE_TYPE_LABELS[type]}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {NODE_TYPE_DESCRIPTIONS[type]}
-                    </div>
-                  </div>
-                </Button>
-              ))}
+                  return (
+                    <Button
+                      key={type}
+                      variant="outline"
+                      className="w-full justify-start gap-3 h-auto py-3"
+                      onClick={() => handleAddNode(type)}
+                      disabled={isTakenTrigger}
+                    >
+                      <div
+                        className={
+                          key === 'triggers'
+                            ? 'flex h-8 w-8 items-center justify-center rounded-md bg-primary/10'
+                            : 'flex h-8 w-8 items-center justify-center rounded-md bg-secondary'
+                        }
+                      >
+                        {NODE_ICONS[type]}
+                      </div>
+                      <div className="text-left">
+                        <div className="font-medium">{NODE_TYPE_LABELS[type]}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {isTakenTrigger
+                            ? 'Already added (only one allowed)'
+                            : NODE_TYPE_DESCRIPTIONS[type]}
+                        </div>
+                      </div>
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       </SheetContent>
     </Sheet>

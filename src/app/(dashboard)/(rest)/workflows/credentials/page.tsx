@@ -1,26 +1,24 @@
-import { Button } from "@/components/ui/button";
-import { PlusIcon } from "lucide-react";
+import { Suspense } from 'react';
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
+import { prefetchCredentials } from '@/features/credentials/server/prefetch';
+import { CredentialsList } from '@/features/credentials/components/credentials-list';
+import { credentialsSearchParamsCache } from '@/features/credentials/params';
+import { EntityLoading } from '@/components/entity-components';
+import type { SearchParams } from 'nuqs/server';
 
-export default function CredentialsPage() {
+interface CredentialsPageProps {
+  searchParams: Promise<SearchParams>;
+}
+
+export default async function CredentialsPage({ searchParams }: CredentialsPageProps) {
+  const params = await credentialsSearchParamsCache.parse(searchParams);
+  const queryClient = await prefetchCredentials(params);
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Credentials</h1>
-          <p className="text-muted-foreground">
-            Store API keys and secrets for your workflow integrations
-          </p>
-        </div>
-        <Button>
-          <PlusIcon className="mr-2 h-4 w-4" />
-          Add Credential
-        </Button>
-      </div>
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">
-          No credentials stored. Add credentials to use in your workflows.
-        </p>
-      </div>
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <Suspense fallback={<EntityLoading />}>
+        <CredentialsList />
+      </Suspense>
+    </HydrationBoundary>
   );
 }

@@ -5,6 +5,15 @@ import { ManualTriggerNode } from '@/features/triggers/components/manual-trigger
 import { GoogleFormTriggerNode } from '@/features/triggers/components/google-form-trigger/google-form-trigger-node';
 import { StripeTriggerNode } from '@/features/triggers/components/stripe-trigger/stripe-trigger-node';
 import { HttpRequestNode } from '@/features/executions/components/http-request/http-request-node';
+import {
+  OpenAiNode,
+  AnthropicNode,
+  GeminiNode,
+} from '@/features/executions/components/ai/provider-nodes';
+import {
+  DiscordNode,
+  SlackNode,
+} from '@/features/executions/components/messaging/messaging-nodes';
 
 // Node type to display name mapping
 export const NODE_TYPE_LABELS: Record<NodeType, string> = {
@@ -13,6 +22,11 @@ export const NODE_TYPE_LABELS: Record<NodeType, string> = {
   [NodeType.GOOGLE_FORM_TRIGGER]: 'Google Form',
   [NodeType.STRIPE_TRIGGER]: 'Stripe',
   [NodeType.HTTP_REQUEST]: 'HTTP Request',
+  [NodeType.OPENAI]: 'OpenAI',
+  [NodeType.ANTHROPIC]: 'Anthropic',
+  [NodeType.GOOGLE_GEMINI]: 'Gemini',
+  [NodeType.DISCORD]: 'Discord',
+  [NodeType.SLACK]: 'Slack',
 };
 
 // Node type to description mapping
@@ -22,6 +36,11 @@ export const NODE_TYPE_DESCRIPTIONS: Record<NodeType, string> = {
   [NodeType.GOOGLE_FORM_TRIGGER]: 'Triggered when form is submitted',
   [NodeType.STRIPE_TRIGGER]: 'Triggered by a Stripe webhook event',
   [NodeType.HTTP_REQUEST]: 'Make an HTTP request',
+  [NodeType.OPENAI]: 'Generate text with an OpenAI model',
+  [NodeType.ANTHROPIC]: 'Generate text with a Claude model',
+  [NodeType.GOOGLE_GEMINI]: 'Generate text with a Gemini model',
+  [NodeType.DISCORD]: 'Post a message to Discord',
+  [NodeType.SLACK]: 'Post a message to Slack',
 };
 
 // Categories for node selector
@@ -32,6 +51,8 @@ export const NODE_CATEGORIES = {
     NodeType.STRIPE_TRIGGER,
   ],
   actions: [NodeType.HTTP_REQUEST],
+  ai: [NodeType.OPENAI, NodeType.ANTHROPIC, NodeType.GOOGLE_GEMINI],
+  messaging: [NodeType.DISCORD, NodeType.SLACK],
 } as const;
 
 // Node types registry for React Flow
@@ -41,4 +62,9 @@ export const nodeTypes: NodeTypes = {
   GOOGLE_FORM_TRIGGER: GoogleFormTriggerNode,
   STRIPE_TRIGGER: StripeTriggerNode,
   HTTP_REQUEST: HttpRequestNode,
+  OPENAI: OpenAiNode,
+  ANTHROPIC: AnthropicNode,
+  GOOGLE_GEMINI: GeminiNode,
+  DISCORD: DiscordNode,
+  SLACK: SlackNode,
 };

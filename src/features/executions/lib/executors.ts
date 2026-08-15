@@ -1,8 +1,13 @@
 import type { NodeModel } from '@/generated/prisma/models/Node';
 import type { ExecutionContext } from './context';
-import { NodeType } from '@/generated/prisma/enums';
+import { NodeType, CredentialType } from '@/generated/prisma/enums';
 import ky from 'ky';
+import { generateText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { interpolate, interpolateObject } from './templating';
+import { resolveCredential } from './credentials';
 
 // Executor function type
 export type NodeExecutor = (
@@ -168,6 +173,147 @@ const executeHttpRequest: NodeExecutor = async (node, context) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// AI nodes
+// ---------------------------------------------------------------------------
+
+interface AiNodeData extends BaseNodeData {
+  model?: string;
+  systemPrompt?: string;
+  userPrompt?: string;
+}
+
+// Sensible defaults if the node was never configured with a model
+const DEFAULT_MODELS = {
+  [NodeType.OPENAI]: 'gpt-4o-mini',
+  [NodeType.ANTHROPIC]: 'claude-sonnet-5',
+  [NodeType.GOOGLE_GEMINI]: 'gemini-2.5-flash',
+} as const;
+
+const AI_CREDENTIAL_TYPES = {
+  [NodeType.OPENAI]: CredentialType.OPENAI,
+  [NodeType.ANTHROPIC]: CredentialType.ANTHROPIC,
+  [NodeType.GOOGLE_GEMINI]: CredentialType.GOOGLE_GEMINI,
+} as const;
+
+type AiNodeType = keyof typeof DEFAULT_MODELS;
+
+/**
+ * All three providers share the AI SDK's `generateText`, so only the model
+ * factory differs. Keys come from the user's own credentials — the app's env
+ * keys are never used for a user's workflow run.
+ */
+function makeAiExecutor(nodeType: AiNodeType): NodeExecutor {
+  return async (node, context) => {
+    const data = node.data as AiNodeData;
+    const templateContext = context.getAllOutputs();
+
+    const apiKey = await resolveCredential(
+      nodeType,
+      node.credentialId,
+      context.userId,
+      AI_CREDENTIAL_TYPES[nodeType]
+    );
+
+    const userPrompt = interpolate(data.userPrompt || '', templateContext);
+    if (!userPrompt.trim()) {
+      throw new NodeValidationError(nodeType, 'userPrompt', 'Prompt is required');
+    }
+
+    const systemPrompt = data.systemPrompt
+      ? interpolate(data.systemPrompt, templateContext)
+      : undefined;
+
+    const modelId = data.model?.trim() || DEFAULT_MODELS[nodeType];
+
+    const model =
+      nodeType === NodeType.OPENAI
+        ? createOpenAI({ apiKey })(modelId)
+        : nodeType === NodeType.ANTHROPIC
+          ? createAnthropic({ apiKey })(modelId)
+          : createGoogleGenerativeAI({ apiKey })(modelId);
+
+    try {
+      const result = await generateText({
+        model,
+        system: systemPrompt,
+        prompt: userPrompt,
+      });
+
+      return {
+        text: result.text,
+        model: modelId,
+        usage: result.usage,
+        finishReason: result.finishReason,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${nodeType} request failed: ${message}`);
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Messaging nodes
+// ---------------------------------------------------------------------------
+
+interface MessagingNodeData extends BaseNodeData {
+  message?: string;
+  // Discord only; Slack takes the name from the webhook configuration
+  username?: string;
+}
+
+/**
+ * Discord and Slack incoming webhooks are both "POST JSON to a secret URL".
+ * Only the body key differs, so the shape is shared.
+ */
+function makeWebhookMessageExecutor(
+  nodeType: typeof NodeType.DISCORD | typeof NodeType.SLACK
+): NodeExecutor {
+  const credentialType =
+    nodeType === NodeType.DISCORD
+      ? CredentialType.DISCORD_WEBHOOK
+      : CredentialType.SLACK_WEBHOOK;
+
+  return async (node, context) => {
+    const data = node.data as MessagingNodeData;
+    const templateContext = context.getAllOutputs();
+
+    const webhookUrl = await resolveCredential(
+      nodeType,
+      node.credentialId,
+      context.userId,
+      credentialType
+    );
+
+    const message = interpolate(data.message || '', templateContext);
+    if (!message.trim()) {
+      throw new NodeValidationError(nodeType, 'message', 'Message is required');
+    }
+
+    const body =
+      nodeType === NodeType.DISCORD
+        ? {
+            content: message,
+            ...(data.username ? { username: data.username } : {}),
+          }
+        : { text: message };
+
+    try {
+      const response = await ky.post(webhookUrl, { json: body, timeout: 15000 });
+
+      return {
+        delivered: true,
+        status: response.status,
+        message,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`${nodeType} message failed: ${message}`);
+    }
+  };
+}
+
 // Executor registry
 const executors: Record<NodeType, NodeExecutor> = {
   [NodeType.INITIAL]: executeInitial,
@@ -175,6 +321,11 @@ const executors: Record<NodeType, NodeExecutor> = {
   [NodeType.GOOGLE_FORM_TRIGGER]: executeGoogleFormTrigger,
   [NodeType.STRIPE_TRIGGER]: executeStripeTrigger,
   [NodeType.HTTP_REQUEST]: executeHttpRequest,
+  [NodeType.OPENAI]: makeAiExecutor(NodeType.OPENAI),
+  [NodeType.ANTHROPIC]: makeAiExecutor(NodeType.ANTHROPIC),
+  [NodeType.GOOGLE_GEMINI]: makeAiExecutor(NodeType.GOOGLE_GEMINI),
+  [NodeType.DISCORD]: makeWebhookMessageExecutor(NodeType.DISCORD),
+  [NodeType.SLACK]: makeWebhookMessageExecutor(NodeType.SLACK),
 };
 
 // Get executor for a node type

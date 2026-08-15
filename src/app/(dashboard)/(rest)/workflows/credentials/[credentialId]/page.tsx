@@ -1,23 +1,22 @@
+import { Suspense } from 'react';
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
+import { prefetchCredential } from '@/features/credentials/server/prefetch';
+import { CredentialDetail } from '@/features/credentials/components/credential-detail';
+import { EntityLoading } from '@/components/entity-components';
+
 interface PageProps {
-  params: Promise<{
-    credentialId: string;
-  }>;
+  params: Promise<{ credentialId: string }>;
 }
 
 export default async function CredentialDetailPage({ params }: PageProps) {
   const { credentialId } = await params;
+  const queryClient = await prefetchCredential(credentialId);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Credential Details</h1>
-        <p className="text-muted-foreground">ID: {credentialId}</p>
-      </div>
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">
-          Credential details will be displayed here.
-        </p>
-      </div>
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <Suspense fallback={<EntityLoading count={1} />}>
+        <CredentialDetail credentialId={credentialId} />
+      </Suspense>
+    </HydrationBoundary>
   );
 }
