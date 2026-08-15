@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeftIcon, CheckIcon, XIcon, PencilIcon, Loader2Icon, PlayIcon, SaveIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { editorInstanceAtom, hasUnsavedChangesAtom } from '../store/atoms';
+import { editorInstanceAtom, hasUnsavedChangesAtom, nodeStatusesAtom } from '../store/atoms';
 import { reactFlowNodeToDbNode, reactFlowEdgeToDbConnection } from '../lib/mapping';
 
 interface EditorHeaderProps {
@@ -22,6 +22,7 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
   const editorInstance = useAtomValue(editorInstanceAtom);
   const hasUnsavedChanges = useAtomValue(hasUnsavedChangesAtom);
   const setHasUnsavedChanges = useSetAtom(hasUnsavedChangesAtom);
+  const setNodeStatuses = useSetAtom(nodeStatusesAtom);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -114,6 +115,8 @@ export function EditorHeader({ workflowId }: EditorHeaderProps) {
   };
 
   const handleExecute = () => {
+    // Clear indicators from the previous run so the canvas reflects this one
+    setNodeStatuses({});
     executeMutation.mutate({ id: workflowId });
   };
 

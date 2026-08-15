@@ -4,13 +4,22 @@ import { inngest } from '@/inngest/client';
 import { NodeType } from '@/generated/prisma/enums';
 
 // Shared secret for webhook authentication
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'default-webhook-secret';
+const WEBHOOK_SECRET = process.env.GOOGLE_FORM_WEBHOOK_SECRET;
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ workflowId: string }> }
 ) {
   const { workflowId } = await params;
+
+  // Fail closed: without a configured secret the endpoint would accept anything
+  if (!WEBHOOK_SECRET) {
+    console.error('GOOGLE_FORM_WEBHOOK_SECRET is not set');
+    return NextResponse.json(
+      { error: 'Webhook not configured' },
+      { status: 500 }
+    );
+  }
 
   // Verify webhook secret
   const secret = request.headers.get('x-webhook-secret');

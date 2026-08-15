@@ -1,7 +1,16 @@
+// A Stripe event envelope as forwarded by the Stripe webhook route
+export interface StripeEventPayload {
+  id: string;
+  type: string;
+  created: number;
+  data: { object: unknown };
+}
+
 // Trigger data from webhooks
 export interface TriggerData {
   type: string;
   formResponse?: unknown;
+  stripeEvent?: StripeEventPayload;
   timestamp: string;
 }
 

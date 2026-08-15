@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server';
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from '@/config/constants';
 import { mapNodesToReactFlow, mapConnectionsToReactFlow } from '@/features/editor/lib/mapping';
 import { inngest } from '@/inngest/client';
+import { NodeType } from '@/generated/prisma/enums';
 
 export const workflowsRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -136,10 +137,12 @@ export const workflowsRouter = createTRPCRouter({
         nodes: z.array(
           z.object({
             id: z.string(),
-            type: z.enum(['INITIAL', 'MANUAL_TRIGGER', 'GOOGLE_FORM_TRIGGER', 'HTTP_REQUEST'] as const),
+            // Derived from the Prisma enum so new node types don't need a second edit here
+            type: z.enum(NodeType),
             positionX: z.number(),
             positionY: z.number(),
             data: z.record(z.string(), z.unknown()),
+            credentialId: z.string().nullable().default(null),
           })
         ),
         connections: z.array(
@@ -166,6 +169,33 @@ export const workflowsRouter = createTRPCRouter({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Not authorized' });
       }
 
+      // Reject credential IDs the caller doesn't own before they reach the DB.
+      // resolveCredential() also scopes by userId at run time, but failing here
+      // means a tampered ID never gets persisted in the first place.
+      const requestedCredentialIds = [
+        ...new Set(
+          input.nodes
+            .map((node) => node.credentialId)
+            .filter((id): id is string => typeof id === 'string')
+        ),
+      ];
+
+      if (requestedCredentialIds.length > 0) {
+        const owned = await prisma.credential.count({
+          where: {
+            id: { in: requestedCredentialIds },
+            userId: ctx.auth.user.id,
+          },
+        });
+
+        if (owned !== requestedCredentialIds.length) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'One or more selected credentials do not exist',
+          });
+        }
+      }
+
       // Use a transaction to update nodes and connections atomically
       await prisma.$transaction(async (tx) => {
         // Delete existing nodes (connections cascade)
@@ -182,6 +212,7 @@ export const workflowsRouter = createTRPCRouter({
               positionX: node.positionX,
               positionY: node.positionY,
               data: node.data as object,
+              credentialId: node.credentialId,
               workflowId: input.id,
             })),
           });
