@@ -146,6 +146,9 @@ model Execution {
   triggerType String?
   // Accumulated node outputs, keyed by variable name
   output      Json?
+  // Per-node progress, keyed by node id: "loading" | "success" | "error".
+  // Polled by the editor to drive the canvas status indicators.
+  nodeStatuses Json?
   error       String?
   stack       String?
   startedAt   DateTime        @default(now())

@@ -57,6 +57,28 @@ export const executionsRouter = createTRPCRouter({
       };
     }),
 
+  /**
+   * Most recent run of one workflow, used by the editor to drive live node
+   * status. Deliberately small — it's polled while a run is in flight.
+   */
+  getLatestForWorkflow: protectedProcedure
+    .input(z.object({ workflowId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const execution = await prisma.execution.findFirst({
+        where: { workflowId: input.workflowId, userId: ctx.auth.user.id },
+        select: {
+          id: true,
+          status: true,
+          nodeStatuses: true,
+          error: true,
+          startedAt: true,
+        },
+        orderBy: { startedAt: 'desc' },
+      });
+
+      return execution;
+    }),
+
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {

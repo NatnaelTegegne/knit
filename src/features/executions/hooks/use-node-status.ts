@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/trpc/client';
+import { ExecutionStatus } from '@/generated/prisma/enums';
 import type { NodeStatus } from '../lib/node-status';
 
 interface UseNodeStatusOptions {
@@ -8,67 +11,60 @@ interface UseNodeStatusOptions {
   enabled?: boolean;
 }
 
+// How often to re-check while a run is in flight
+const POLL_INTERVAL_MS = 1000;
+
+const VALID_STATUSES: NodeStatus[] = ['idle', 'loading', 'success', 'error'];
+
+// Guard rather than cast: these values come out of a Json column, so a bad
+// payload shouldn't be able to put the UI into an impossible state.
+function isValidStatus(value: unknown): value is NodeStatus {
+  return typeof value === 'string' && VALID_STATUSES.includes(value as NodeStatus);
+}
+
 /**
- * Hook for tracking node execution statuses
+ * Live per-node execution status for the editor canvas.
  *
- * Note: Real-time updates require additional Inngest realtime setup.
- * Currently provides manual status tracking that can be updated by
- * components during execution.
+ * Polls the workflow's most recent Execution row while it is RUNNING and stops
+ * once it settles. This replaces the Inngest realtime subscription: as of
+ * @inngest/realtime 0.4.7 that package still depends on inngest@^3, which is
+ * incompatible with the inngest@4 client this app uses.
  */
 export function useNodeStatus({ workflowId, enabled = true }: UseNodeStatusOptions) {
-  const [statuses, setStatuses] = useState<Record<string, NodeStatus>>({});
-  const [outputs, setOutputs] = useState<Record<string, unknown>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const trpc = useTRPC();
 
-  const setNodeStatus = useCallback(
-    (nodeId: string, status: NodeStatus, output?: unknown, error?: string) => {
-      setStatuses((prev) => ({ ...prev, [nodeId]: status }));
-      if (output !== undefined) {
-        setOutputs((prev) => ({ ...prev, [nodeId]: output }));
+  const { data } = useQuery({
+    ...trpc.executions.getLatestForWorkflow.queryOptions({ workflowId }),
+    enabled,
+    // Only keep polling while the latest run is still going
+    refetchInterval: (query) =>
+      query.state.data?.status === ExecutionStatus.RUNNING ? POLL_INTERVAL_MS : false,
+  });
+
+  const statuses = useMemo(() => {
+    const raw = (data?.nodeStatuses ?? {}) as Record<string, unknown>;
+    const result: Record<string, NodeStatus> = {};
+
+    for (const [nodeId, status] of Object.entries(raw)) {
+      if (isValidStatus(status)) {
+        result[nodeId] = status;
       }
-      if (error !== undefined) {
-        setErrors((prev) => ({ ...prev, [nodeId]: error }));
-      }
-    },
-    []
-  );
+    }
+
+    return result;
+  }, [data?.nodeStatuses]);
 
   const getNodeStatus = useCallback(
-    (nodeId: string): NodeStatus => {
-      return statuses[nodeId] || 'idle';
-    },
+    (nodeId: string): NodeStatus => statuses[nodeId] || 'idle',
     [statuses]
   );
 
-  const getNodeOutput = useCallback(
-    (nodeId: string): unknown => {
-      return outputs[nodeId];
-    },
-    [outputs]
-  );
-
-  const getNodeError = useCallback(
-    (nodeId: string): string | undefined => {
-      return errors[nodeId];
-    },
-    [errors]
-  );
-
-  const resetStatuses = useCallback(() => {
-    setStatuses({});
-    setOutputs({});
-    setErrors({});
-  }, []);
-
   return {
     statuses,
-    outputs,
-    errors,
-    isConnected: false, // Not connected to realtime
+    executionId: data?.id ?? null,
+    executionStatus: data?.status ?? null,
+    error: data?.error ?? null,
+    isRunning: data?.status === ExecutionStatus.RUNNING,
     getNodeStatus,
-    getNodeOutput,
-    getNodeError,
-    setNodeStatus,
-    resetStatuses,
   };
 }

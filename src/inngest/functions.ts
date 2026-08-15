@@ -36,6 +36,9 @@ export const executeWorkflow = inngest.createFunction(
   async ({ event, step }: { event: ExecuteWorkflowEvent; step: any }) => {
     const { workflowId, userId, triggerData } = event.data;
 
+    // Per-node progress, mirrored onto the Execution row so the editor can show
+    // live status by polling. Kept in memory and written on each transition.
+    const nodeStatuses: Record<string, string> = {};
 
     // Fetch workflow with nodes and connections
     const workflow = await step.run("fetch-workflow", async () => {
@@ -71,6 +74,23 @@ export const executeWorkflow = inngest.createFunction(
       });
     });
 
+    // Write the current progress map. Never let a status write break the run —
+    // the execution's own status/output remain the source of truth.
+    const writeStatuses = async (label: string) => {
+      try {
+        await step.run(label, async () => {
+          await prisma.execution.update({
+            where: { id: execution.id },
+            data: { nodeStatuses: { ...nodeStatuses } },
+            select: { id: true },
+          });
+          return null;
+        });
+      } catch (statusError) {
+        console.warn("Failed to write node statuses", statusError);
+      }
+    };
+
     // Sort nodes topologically
     const sortedNodes = await step.run("sort-nodes", async () => {
       return topologicalSort(workflow.nodes, workflow.connections);
@@ -96,11 +116,15 @@ export const executeWorkflow = inngest.createFunction(
         }
 
         currentNodeId = node.id;
+        nodeStatuses[node.id] = "loading";
+        await writeStatuses(`status-loading-${node.id}`);
 
         const output = await step.run(`execute-${node.type}-${node.id}`, async () => {
           return executeNode(node, context);
         });
 
+        nodeStatuses[node.id] = "success";
+        await writeStatuses(`status-success-${node.id}`);
 
         // Store result using variable name as key
         const contextKey = getContextKey(node);
@@ -112,6 +136,10 @@ export const executeWorkflow = inngest.createFunction(
       const message = error instanceof Error ? error.message : String(error);
       const stack = error instanceof Error ? error.stack : undefined;
 
+      if (currentNodeId) {
+        nodeStatuses[currentNodeId] = "error";
+      }
+
       await step.run("record-failure", async () => {
         return prisma.execution.update({
           where: { id: execution.id },
@@ -120,6 +148,7 @@ export const executeWorkflow = inngest.createFunction(
             error: message,
             stack: stack ?? null,
             output: results as object,
+            nodeStatuses: { ...nodeStatuses },
             completedAt: new Date(),
           },
           select: { id: true },
@@ -135,6 +164,7 @@ export const executeWorkflow = inngest.createFunction(
         data: {
           status: ExecutionStatus.SUCCESS,
           output: results as object,
+          nodeStatuses: { ...nodeStatuses },
           completedAt: new Date(),
         },
         select: { id: true },
