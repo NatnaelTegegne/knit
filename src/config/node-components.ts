@@ -1,9 +1,9 @@
 import type { NodeTypes } from '@xyflow/react';
 import { NodeType } from '@/generated/prisma/enums';
 import { InitialNode } from '@/components/react-flow/initial-node';
-import { ManualTriggerNode } from '@/features/triggers/components/manual-trigger-node';
-import { GoogleFormTriggerNode } from '@/features/triggers/components/google-form-trigger-node';
-import { HttpRequestNode } from '@/features/executions/components/http-request-node';
+import { ManualTriggerNode } from '@/features/triggers/components/manual-trigger/manual-trigger-node';
+import { GoogleFormTriggerNode } from '@/features/triggers/components/google-form-trigger/google-form-trigger-node';
+import { HttpRequestNode } from '@/features/executions/components/http-request/http-request-node';
 
 // Node type to display name mapping
 export const NODE_TYPE_LABELS: Record<NodeType, string> = {

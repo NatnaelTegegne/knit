@@ -7,7 +7,7 @@ import { BaseExecutionNode } from '@/components/react-flow/base-execution-node';
 import { GlobeIcon } from 'lucide-react';
 import { HttpRequestDialog } from './http-request-dialog';
 import { nodeStatusesAtom } from '@/features/editor/store/atoms';
-import { hasTemplateExpressions } from '../lib/templating';
+import { hasTemplateExpressions } from '../../lib/templating';
 
 interface HttpRequestData {
   variableName?: string;

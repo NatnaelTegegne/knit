@@ -17,7 +17,7 @@ export const GoogleFormTriggerNode = memo(function GoogleFormTriggerNode({
   return (
     <BaseTriggerNode
       selected={selected}
-      icon={<FileSpreadsheetIcon className="h-5 w-5 text-green-600" />}
+      icon={<FileSpreadsheetIcon className="h-5 w-5 text-purple-600" />}
       label="Google Form"
       description="Triggered on form submit"
       status={status}
