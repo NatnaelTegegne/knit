@@ -9,6 +9,12 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // Migrations run DDL, which shouldn't go through Neon's connection pooler.
+    // In production DIRECT_URL is the unpooled endpoint; DATABASE_URL (pooled)
+    // is what the app uses at runtime via the pg adapter. Locally only
+    // DATABASE_URL is set, so this falls back to it.
+    // `||` not `??`: a blank DIRECT_URL= line in .env is an empty string, which
+    // `??` would pass through as the connection string.
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });
