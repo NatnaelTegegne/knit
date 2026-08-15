@@ -1,17 +1,24 @@
-export default function ExecutionsPage() {
+import { Suspense } from 'react';
+import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
+import { prefetchExecutions } from '@/features/executions/server/prefetch';
+import { ExecutionsList } from '@/features/executions/components/executions-list';
+import { executionsSearchParamsCache } from '@/features/executions/params';
+import { EntityLoading } from '@/components/entity-components';
+import type { SearchParams } from 'nuqs/server';
+
+interface ExecutionsPageProps {
+  searchParams: Promise<SearchParams>;
+}
+
+export default async function ExecutionsPage({ searchParams }: ExecutionsPageProps) {
+  const params = await executionsSearchParamsCache.parse(searchParams);
+  const queryClient = await prefetchExecutions(params);
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Executions</h1>
-        <p className="text-muted-foreground">
-          View the history of your workflow executions
-        </p>
-      </div>
-      <div className="rounded-lg border border-dashed p-8 text-center">
-        <p className="text-muted-foreground">
-          No executions yet. Run a workflow to see execution history.
-        </p>
-      </div>
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <Suspense fallback={<EntityLoading />}>
+        <ExecutionsList />
+      </Suspense>
+    </HydrationBoundary>
   );
 }
