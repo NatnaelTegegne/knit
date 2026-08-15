@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server';
 import { DEFAULT_PAGE, DEFAULT_PAGE_SIZE } from '@/config/constants';
 import { mapNodesToReactFlow, mapConnectionsToReactFlow } from '@/features/editor/lib/mapping';
 import { inngest } from '@/inngest/client';
+import { NodeType } from '@/generated/prisma/enums';
 
 export const workflowsRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -136,7 +137,8 @@ export const workflowsRouter = createTRPCRouter({
         nodes: z.array(
           z.object({
             id: z.string(),
-            type: z.enum(['INITIAL', 'MANUAL_TRIGGER', 'GOOGLE_FORM_TRIGGER', 'HTTP_REQUEST'] as const),
+            // Derived from the Prisma enum so new node types don't need a second edit here
+            type: z.enum(NodeType),
             positionX: z.number(),
             positionY: z.number(),
             data: z.record(z.string(), z.unknown()),

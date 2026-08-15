@@ -68,6 +68,34 @@ const executeGoogleFormTrigger: NodeExecutor = async (node, context) => {
   };
 };
 
+// Execute STRIPE_TRIGGER node
+const executeStripeTrigger: NodeExecutor = async (node, context) => {
+  const triggerData = context.triggerData;
+
+  if (!triggerData || triggerData.type !== 'stripe' || !triggerData.stripeEvent) {
+    // If not triggered by a Stripe webhook, return empty data
+    return {
+      triggered: false,
+      message: 'Not triggered by a Stripe event',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  const { id, type, created, data } = triggerData.stripeEvent;
+
+  // The event filter is enforced by the webhook route before the workflow is
+  // queued, so by the time we get here the event is one this node wants.
+  return {
+    triggered: true,
+    eventId: id,
+    eventType: type,
+    created,
+    // `object` is the resource the event is about (session, invoice, ...)
+    object: data.object,
+    timestamp: triggerData.timestamp,
+  };
+};
+
 // Validate HTTP Request required fields (after interpolation)
 function validateHttpRequestUrl(url: string): void {
   if (!url || url.trim() === '') {
@@ -145,6 +173,7 @@ const executors: Record<NodeType, NodeExecutor> = {
   [NodeType.INITIAL]: executeInitial,
   [NodeType.MANUAL_TRIGGER]: executeManualTrigger,
   [NodeType.GOOGLE_FORM_TRIGGER]: executeGoogleFormTrigger,
+  [NodeType.STRIPE_TRIGGER]: executeStripeTrigger,
   [NodeType.HTTP_REQUEST]: executeHttpRequest,
 };
 

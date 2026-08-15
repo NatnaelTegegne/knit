@@ -1,15 +1,8 @@
 import { inngest } from "./client";
 import prisma from "@/lib/db";
 import { topologicalSort } from "@/features/executions/lib/topological-sort";
-import { createExecutionContext } from "@/features/executions/lib/context";
+import { createExecutionContext, type TriggerData } from "@/features/executions/lib/context";
 import { executeNode } from "@/features/executions/lib/executors";
-
-// Trigger data from webhooks
-interface TriggerData {
-  type: string;
-  formResponse?: unknown;
-  timestamp: string;
-}
 
 // Define event types
 type ExecuteWorkflowEvent = {

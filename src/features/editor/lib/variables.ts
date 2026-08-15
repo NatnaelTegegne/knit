@@ -6,6 +6,7 @@ const VARIABLE_PREFIXES: Record<NodeType, string> = {
   [NodeType.INITIAL]: 'initial',
   [NodeType.MANUAL_TRIGGER]: 'trigger',
   [NodeType.GOOGLE_FORM_TRIGGER]: 'formResponse',
+  [NodeType.STRIPE_TRIGGER]: 'stripeEvent',
   [NodeType.HTTP_REQUEST]: 'httpResponse',
 };
 
